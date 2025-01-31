@@ -1,39 +1,52 @@
-from controllers.controller_chatbot import Chatbot
 from flask import Blueprint, jsonify, request
+import logging
+from controllers.controller_chatbot import ChatbotBancario
 
-# Define el blueprint para las rutas del chatbot
+logging.basicConfig(level=logging.INFO)
+
 url_chatbot = Blueprint('url_chatbot', __name__)
 
-# Instancia del chatbot
-chatbot = Chatbot()
+chatbot = ChatbotBancario()
 
-@url_chatbot.route('/chat', methods=['POST'])
+@url_chatbot.route('/chat', methods=['POST', 'GET'])
 def chat():
     try:
+        if request.method == 'GET':
+            return jsonify({
+                "mensaje": "Bienvenido a la API del chatbot del Banco de Loja. Usa el método POST para enviar consultas.",
+                "code": 200
+            }), 200
+
         # Obtiene los datos enviados como JSON
         data = request.get_json()
-        
-        # Valida que los datos sean correctos
-        if not data or 'consulta' not in data:
+
+        # Validar que se reciba un JSON y que tenga la clave 'consulta'
+        if not data or 'consulta' not in data or not isinstance(data['consulta'], str) or not data['consulta'].strip():
             return jsonify({
-                "error": "Solicitud inválida. Debe incluir el campo 'consulta'.",
+                "error": "Solicitud inválida. Debe incluir un campo 'consulta' no vacío.",
                 "code": 400
             }), 400
 
-        # Procesa la consulta
-        consulta = data['consulta']
+        # Extrae la consulta y procesa la respuesta
+        consulta = data['consulta'].strip()
         respuesta = chatbot.procesar_consulta(consulta)
 
-        # Devuelve la respuesta en formato JSON
+        logging.info(f"Consulta: {consulta} | Respuesta: {respuesta}")
+
         return jsonify({
             "respuesta": respuesta,
             "code": 200
         }), 200
 
-    except Exception as e:
-        # Manejo de errores inesperados
+    except KeyError:
         return jsonify({
-            "error": f"Ha ocurrido un error: {str(e)}",
+            "error": "Solicitud inválida. Falta el campo 'consulta'.",
+            "code": 400
+        }), 400
+
+    except Exception as e:
+        logging.error(f"Error inesperado: {str(e)}")
+        return jsonify({
+            "error": f"Error interno del servidor: {str(e)}",
             "code": 500
         }), 500
-    
